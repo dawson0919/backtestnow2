@@ -76,9 +76,7 @@ export default function MarketsPage() {
 
   async function loadOne(a: typeof ASSETS[0], idx: number) {
     try {
-      const endpoint = a.type === 'crypto'
-        ? `/api/market-data/binance?symbol=${a.symbol}&interval=1D&limit=30`
-        : `/api/market-data/yahoo?symbol=${a.symbol}&interval=1D&limit=30`
+      const endpoint = `/api/market-data/db?symbol=${a.symbol}&interval=1D&limit=30`
       const res  = await fetch(endpoint)
       const json = await res.json() as { data: { open: number; high: number; low: number; close: number; volume: number }[] }
       if (!res.ok || !json.data?.length) throw new Error('no data')
