@@ -96,6 +96,8 @@ function BacktestContent() {
   const [aiReasons, setAiReasons]     = useState<{varName:string;reason:string}[]>([])
   const [barCount, setBarCount]       = useState<number | null>(null)
   const [barCountLoading, setBarCountLoading] = useState(false)
+  const [membership, setMembership]   = useState<{ remaining: number; limit: number; role: string } | null>(null)
+  const [copySuccess, setCopySuccess] = useState(false)
 
   // Strategy save / load
   const [showStrategies, setShowStrategies] = useState(false)
@@ -107,6 +109,14 @@ function BacktestContent() {
 
   const logsRef = useRef<HTMLDivElement>(null)
   const estimatedCombos = estimateCombinations(paramRanges)
+
+  // Fetch membership on mount
+  useEffect(() => {
+    fetch('/api/membership')
+      .then(r => r.json())
+      .then(d => { if (d.remaining !== undefined) setMembership({ remaining: d.remaining, limit: d.limit, role: d.role }) })
+      .catch(() => {})
+  }, [])
 
   // Fetch bar count when asset or timeframe changes
   useEffect(() => {
@@ -194,11 +204,14 @@ function BacktestContent() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setResults(data.results || [])
+      // Update remaining count locally after a successful run
+      setMembership(prev => prev && prev.role !== 'admin' ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : prev)
+
       if (data.results?.length > 0) {
         setSelectedResult(data.results[0])
         const b = data.results[0].result
         addLog(`✅ Done! Tested ${data.testedCount ?? data.totalResults} sets on ${data.barsCount} bars.`)
-        if (data.timedOut) addLog(`⚠️  Timeout: returned partial results (${data.totalResults} found before 50s limit).`)
+        if (data.timedOut) addLog(`⚠️  已達 50 秒限制，返回部分結果（共 ${data.totalResults} 組）。建議：縮短最大組合數，或改用 1D 時間框架。`)
         addLog(`🏆 Best: Return ${formatPercent(b.totalReturnPct)}, Sharpe ${b.sharpeRatio}, WinRate ${b.winRate.toFixed(1)}%`)
         if (user?.id) {
           const saveRes = await fetch('/api/save-result', {
@@ -236,7 +249,14 @@ function BacktestContent() {
       }
     } catch (err) {
       clearInterval(iv); setProgress(0)
-      addLog(`❌ Error: ${err instanceof Error ? err.message : 'Unknown'}`)
+      const msg = err instanceof Error ? err.message : 'Unknown'
+      if (msg.includes('Insufficient data') || msg.includes('insufficient')) {
+        addLog(`❌ 資料不足：此資產 / 時間框架的 K 棒數量不夠。建議改選「1D」或「4H」時間框架再試一次。`)
+      } else if (msg.includes('上限') || msg.includes('limitReached') || msg.includes('limit')) {
+        addLog(`❌ 本月回測次數已用完，請申請進階會員以獲得更多使用次數。`)
+      } else {
+        addLog(`❌ 錯誤：${msg}`)
+      }
     } finally { setRunning(false) }
   }
 
@@ -338,6 +358,22 @@ function BacktestContent() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Usage remaining badge */}
+          {membership && membership.role !== 'admin' && (
+            <div className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold',
+              membership.remaining === 0
+                ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                : membership.remaining <= 5
+                ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                : membership.remaining <= 10
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                : 'bg-[#161b1e] border-[#2d3439] text-slate-400'
+            )}>
+              <span className="material-symbols-outlined text-[13px]">bolt</span>
+              <span>{membership.remaining}/{membership.limit} 次</span>
+            </div>
+          )}
           <div className="relative">
             <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[14px]">search</span>
             <input className="bg-[#161b1e] border border-[#2d3439] rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#3b82f6] w-44" placeholder="搜尋策略、資產..." />
@@ -854,10 +890,22 @@ function BacktestContent() {
               <pre className="bg-[#0d1117] rounded-xl p-4 text-[12px] font-mono text-slate-300 whitespace-pre-wrap leading-6">{exportedCode}</pre>
             </div>
             <div className="p-4 border-t border-[#2d3439] flex gap-3">
-              <button onClick={() => navigator.clipboard.writeText(exportedCode)}
-                className="flex-1 bg-[#3b82f6] hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
-                <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                複製程式碼
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(exportedCode)
+                  setCopySuccess(true)
+                  setTimeout(() => setCopySuccess(false), 2000)
+                }}
+                className={cn(
+                  'flex-1 font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg',
+                  copySuccess
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'
+                    : 'bg-[#3b82f6] hover:bg-blue-500 text-white shadow-blue-900/30'
+                )}>
+                <span className="material-symbols-outlined text-[16px]">
+                  {copySuccess ? 'check' : 'content_copy'}
+                </span>
+                {copySuccess ? '已複製！' : '複製程式碼'}
               </button>
               <button onClick={() => setShowExport(false)}
                 className="px-5 bg-[#0a0d0f] border border-[#2d3439] text-slate-300 rounded-xl text-sm hover:bg-[#1e2227] transition-colors">
