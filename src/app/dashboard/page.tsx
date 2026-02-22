@@ -297,7 +297,7 @@ export default function DashboardPage() {
                 {seeding ? '補充中...' : '補充歷史資料'}
               </button>
             )}
-            <Link href="/dashboard/backtest" className="text-xs font-bold text-[#3b82f6] hover:underline">查看所有市場</Link>
+            <Link href="/dashboard/markets" className="text-xs font-bold text-[#3b82f6] hover:underline">查看所有市場</Link>
           </div>
         </div>
 

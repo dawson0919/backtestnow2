@@ -17,6 +17,7 @@ interface SavedStrategy {
 
 const navItems = [
   { href: '/dashboard',           icon: 'dashboard',    label: '儀表板' },
+  { href: '/dashboard/markets',   icon: 'monitoring',   label: '市場' },
   { href: '/dashboard/backtest',  icon: 'tune',         label: '優化器' },
   { href: '/dashboard/history',   icon: 'history',      label: '歷史' },
 ]
