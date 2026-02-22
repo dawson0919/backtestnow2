@@ -129,6 +129,35 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Sponsor banner */}
+      <div className="border-t border-[#1e2227] bg-[#080a0c] px-5 py-2 flex items-center gap-4 flex-wrap justify-center">
+        <span className="text-[9px] font-black uppercase tracking-widest text-slate-700 shrink-0">贊助夥伴</span>
+        <div className="w-px h-4 bg-[#1e2227] shrink-0" />
+        {/* MiTrade */}
+        <a href="https://mytd.cc/dMzp" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm shrink-0">
+            <span className="text-[11px] font-black text-white" style={{ fontStyle: 'italic' }}>M</span>
+          </div>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-sm font-black text-white tracking-tight leading-none">Mi</span>
+            <span className="text-sm font-black text-blue-400 tracking-tight leading-none">TRADE</span>
+          </div>
+          <span className="text-[9px] font-bold text-blue-500 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded hidden sm:block">立即開戶</span>
+        </a>
+        <div className="w-px h-4 bg-[#1e2227] shrink-0" />
+        {/* Pionex 派網 */}
+        <a href="https://reurl.cc/oKAgxg" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-sm shrink-0">
+            <span className="text-[11px] font-black text-white">P</span>
+          </div>
+          <span className="text-sm font-black text-white tracking-tight leading-none">派網</span>
+          <span className="text-[10px] text-slate-500 hidden sm:block group-hover:text-slate-400 transition-colors">· Pionex</span>
+          <span className="text-[9px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded hidden sm:block">立即開戶</span>
+        </a>
+      </div>
+
       {/* Footer */}
       <footer className="border-t border-[#1e2227] py-8 px-6 text-center text-xs text-slate-500">
         <p>© 2026 BacktestNow. All rights reserved. 資料僅供參考，不構成投資建議。</p>

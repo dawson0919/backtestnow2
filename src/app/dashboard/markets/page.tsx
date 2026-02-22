@@ -4,20 +4,23 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 const ASSETS = [
-  { symbol: 'BTCUSDT', label: 'BTC / USD',    type: 'crypto',  category: '加密貨幣' },
-  { symbol: 'ETHUSDT', label: 'ETH / USD',    type: 'crypto',  category: '加密貨幣' },
-  { symbol: 'SOLUSDT', label: 'SOL / USD',    type: 'crypto',  category: '加密貨幣' },
-  { symbol: 'BNBUSDT', label: 'BNB / USD',    type: 'crypto',  category: '加密貨幣' },
-  { symbol: 'GC!',     label: 'GC (Gold)',    type: 'yahoo',   category: '期貨' },
-  { symbol: 'NQ!',     label: 'NQ (Nasdaq)',  type: 'yahoo',   category: '期貨' },
-  { symbol: 'ES!',     label: 'ES (S&P 500)', type: 'yahoo',   category: '期貨' },
-  { symbol: 'SIL!',   label: 'SIL (Silver)', type: 'yahoo',   category: '期貨' },
+  { symbol: 'BTCUSDT', label: 'BTC / USD',    type: 'crypto', category: '加密貨幣', accent: '#f97316', glow: 'rgba(249,115,22,0.12)',  icon: '₿' },
+  { symbol: 'ETHUSDT', label: 'ETH / USD',    type: 'crypto', category: '加密貨幣', accent: '#818cf8', glow: 'rgba(129,140,248,0.12)', icon: 'Ξ' },
+  { symbol: 'SOLUSDT', label: 'SOL / USD',    type: 'crypto', category: '加密貨幣', accent: '#a78bfa', glow: 'rgba(167,139,250,0.12)', icon: '◎' },
+  { symbol: 'BNBUSDT', label: 'BNB / USD',    type: 'crypto', category: '加密貨幣', accent: '#fbbf24', glow: 'rgba(251,191,36,0.12)',  icon: 'B' },
+  { symbol: 'GC!',     label: 'GC (Gold)',    type: 'yahoo',  category: '期貨',     accent: '#f59e0b', glow: 'rgba(245,158,11,0.12)',  icon: '♦' },
+  { symbol: 'NQ!',     label: 'NQ (Nasdaq)',  type: 'yahoo',  category: '期貨',     accent: '#22d3ee', glow: 'rgba(34,211,238,0.12)',  icon: 'N' },
+  { symbol: 'ES!',     label: 'ES (S&P 500)', type: 'yahoo',  category: '期貨',     accent: '#34d399', glow: 'rgba(52,211,153,0.12)',  icon: 'S' },
+  { symbol: 'SIL!',   label: 'SIL (Silver)', type: 'yahoo',  category: '期貨',     accent: '#94a3b8', glow: 'rgba(148,163,184,0.12)', icon: 'Ag' },
 ]
 
 interface AssetData {
   symbol: string
   label: string
   category: string
+  accent: string
+  glow: string
+  icon: string
   price: number
   change: number
   changeAbs: number
@@ -211,11 +214,26 @@ export default function MarketsPage() {
 function AssetCard({ asset: a }: { asset: AssetData }) {
   const pos = a.change >= 0
   return (
-    <div className="bg-[#161b1e] border border-[#2d3439] rounded-xl p-4 hover:border-[#3b82f6]/40 transition-colors">
-      <div className="flex justify-between items-start mb-1">
-        <div>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{a.label}</p>
-          <p className="text-[9px] text-slate-600">{a.category}</p>
+    <div
+      className="rounded-xl p-4 transition-all hover:scale-[1.01]"
+      style={{ background: '#161b1e', border: `1px solid ${a.accent}28`, boxShadow: `0 4px 24px ${a.glow}` }}
+    >
+      {/* Accent top stripe */}
+      <div className="h-[2px] rounded-full mb-3 -mt-1 -mx-1" style={{ background: `linear-gradient(90deg, ${a.accent}, transparent)` }} />
+
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-2">
+          {/* Icon badge */}
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
+            style={{ background: a.glow, color: a.accent, border: `1px solid ${a.accent}40` }}
+          >
+            {a.icon}
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">{a.label}</p>
+            <p className="text-[9px] text-slate-600">{a.category}</p>
+          </div>
         </div>
         {a.loaded && !a.error && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-1 ${pos ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -230,7 +248,7 @@ function AssetCard({ asset: a }: { asset: AssetData }) {
         ) : a.error ? (
           <p className="text-sm text-red-500/60">資料載入失敗</p>
         ) : (
-          <h3 className="text-2xl font-black text-white">
+          <h3 className="text-2xl font-black" style={{ color: a.accent }}>
             ${fmt(a.price)}
           </h3>
         )}
@@ -243,10 +261,10 @@ function AssetCard({ asset: a }: { asset: AssetData }) {
       )}
 
       {a.loaded && !a.error && (
-        <div className="flex justify-between text-[10px] text-slate-500 mt-2 pt-2 border-t border-[#2d3439]">
+        <div className="flex justify-between text-[10px] text-slate-500 mt-2 pt-2" style={{ borderTop: `1px solid ${a.accent}18` }}>
           <span>H: ${fmt(a.high)}</span>
           <span>L: ${fmt(a.low)}</span>
-          <Link href={`/dashboard/backtest?asset=${a.symbol}`} className="text-[#3b82f6] hover:underline font-bold">回測 →</Link>
+          <Link href={`/dashboard/backtest?asset=${a.symbol}`} className="font-bold hover:underline" style={{ color: a.accent }}>回測 →</Link>
         </div>
       )}
     </div>
