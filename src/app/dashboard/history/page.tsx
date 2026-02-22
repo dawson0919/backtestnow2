@@ -741,6 +741,10 @@ function HistoryContent() {
         {(() => {
           const trades = selected?.trades_summary ?? []
           if (trades.length === 0) return null
+          // chronoOrder maps entryTs -> chronological number (#1 = oldest)
+          const chronoOrder = new Map<number, number>(
+            [...trades].sort((a, b) => a.entryTs - b.entryTs).map((t, i) => [t.entryTs, i + 1])
+          )
           const sorted = [...trades].sort((a, b) =>
             tradeSort === 'pnl' ? b.pnlPct - a.pnlPct : b.entryTs - a.entryTs
           )
@@ -799,7 +803,7 @@ function HistoryContent() {
                       const durLabel   = durationD >= 1
                         ? `${durationD}天${durationH % 24 > 0 ? ` ${durationH % 24}h` : ''}`
                         : `${durationH}h`
-                      const seqNum = i + 1
+                      const seqNum = chronoOrder.get(t.entryTs) ?? i + 1
                       return (
                         <tr key={i} className={`transition-colors hover:bg-[#161b1e] ${isWin ? '' : 'bg-red-950/5'}`}>
                           <td className="px-4 py-3 text-slate-500 font-mono text-xs">#{seqNum}</td>
