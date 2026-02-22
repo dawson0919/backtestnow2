@@ -13,16 +13,19 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+function getSupabase() {
+  if (!_supabase) _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return _supabase
+}
 
 interface OHLCV {
   timestamp: number; open: number; high: number; low: number; close: number; volume: number
 }
 
-// ?€?€?€ Binance ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// --- Binance ---
 const BINANCE_IV: Record<string, string> = { '1H':'1h', '4H':'4h', '1D':'1d' }
 
 async function fetchBinance(symbol: string, interval: string, limit = 1000): Promise<OHLCV[]> {
@@ -40,7 +43,7 @@ async function fetchBinance(symbol: string, interval: string, limit = 1000): Pro
   }))
 }
 
-// ?€?€?€ Yahoo Finance ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// --- Yahoo Finance ---
 const YAHOO_SYMBOL: Record<string, string> = {
   'GC!':'GC=F', 'ES!':'ES=F', 'NQ!':'NQ=F', 'SIL!':'SI=F', 'YM!':'YM=F',
 }
@@ -92,7 +95,7 @@ async function upsertBatch(assetId: number, timeframe: string, bars: OHLCV[], lo
       asset_id: assetId, timeframe,
       timestamp: b.timestamp, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
     }))
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('historical_data')
       .upsert(chunk, { onConflict: 'asset_id,timeframe,timestamp' })
     if (error) { errors.push(`upsert ${timeframe} chunk ${i}: ${error.message}`); return }
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Check admin role
-  const { data: role } = await supabase.from('user_roles').select('role').eq('user_id', userId).single()
+  const { data: role } = await getSupabase().from('user_roles').select('role').eq('user_id', userId).single()
   if (!role || role.role !== 'admin') {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   }
@@ -113,38 +116,38 @@ export async function POST(req: NextRequest) {
   const log: string[] = []
   const errors: string[] = []
 
-  // ?€?€?€ Crypto: BTC, ETH, SOL, BNB ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+  // --- Crypto: BTC, ETH, SOL, BNB ---
   const cryptoSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
 
   for (const symbol of cryptoSymbols) {
-    const { data: asset } = await supabase.from('assets').select('id').eq('symbol', symbol).single()
+    const { data: asset } = await getSupabase().from('assets').select('id').eq('symbol', symbol).single()
     if (!asset) { errors.push(`Asset not found: ${symbol}`); continue }
     log.push(`=== ${symbol} ===`)
 
-    // 1D: 1000 bars ??2.7 years
+    // 1D: 1000 bars ~2.7 years
     try {
       const bars = await fetchBinance(symbol, '1D', 1000)
       await upsertBatch(asset.id, '1D', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 1D: ${e}`) }
 
-    // 4H: 1000 bars ??167 days
+    // 4H: 1000 bars ~167 days
     try {
       const bars = await fetchBinance(symbol, '4H', 1000)
       await upsertBatch(asset.id, '4H', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 4H: ${e}`) }
 
-    // 1H: 1000 bars ??42 days (already have some, this tops up)
+    // 1H: 1000 bars ~42 days
     try {
       const bars = await fetchBinance(symbol, '1H', 1000)
       await upsertBatch(asset.id, '1H', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 1H: ${e}`) }
   }
 
-  // ?€?€?€ Futures: already have good history; refresh last 30 days ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+  // --- Futures: refresh last 30 days ---
   const futuresSymbols = ['GC!', 'ES!', 'NQ!', 'SIL!', 'YM!']
 
   for (const symbol of futuresSymbols) {
-    const { data: asset } = await supabase.from('assets').select('id').eq('symbol', symbol).single()
+    const { data: asset } = await getSupabase().from('assets').select('id').eq('symbol', symbol).single()
     if (!asset) { errors.push(`Asset not found: ${symbol}`); continue }
     log.push(`=== ${symbol} ===`)
 
@@ -158,7 +161,7 @@ export async function POST(req: NextRequest) {
       await upsertBatch(asset.id, '4H', bars4H, log, errors)
     } catch (e) { errors.push(`${symbol} 1H/4H: ${e}`) }
 
-    // 1D: last 5 years (Yahoo default)
+    // 1D: last 5 years
     try {
       const bars1D = await fetchYahoo(symbol, '1D', 365 * 5)
       await upsertBatch(asset.id, '1D', bars1D, log, errors)
@@ -177,7 +180,7 @@ export async function GET(_req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('historical_data')
     .select('asset_id, timeframe, count:id.count()')
 

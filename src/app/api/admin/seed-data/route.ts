@@ -3,7 +3,7 @@
  * Fetch and upsert historical OHLCV data into Supabase.
  * Requires auth (no admin-role table needed).
  * POST { symbols?: string[], timeframes?: string[], limit?: number }
- * limit can exceed 1000 ??will page through Binance API automatically.
+ * limit can exceed 1000 -- will page through Binance API automatically.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
@@ -11,10 +11,13 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+function getSupabase() {
+  if (!_supabase) _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return _supabase
+}
 
 interface OHLCV {
   timestamp: number; open: number; high: number; low: number; close: number; volume: number
@@ -84,7 +87,7 @@ async function upsertBars(assetId: number, timeframe: string, bars: OHLCV[]) {
   }))
   // Supabase upsert in chunks of 500
   for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('historical_data')
       .upsert(rows.slice(i, i + 500), { onConflict: 'asset_id,timeframe,timestamp' })
     if (error) throw new Error(`DB upsert error: ${error.message}`)
@@ -113,17 +116,17 @@ export async function POST(req: NextRequest) {
   const errors: string[] = []
 
   for (const symbol of symbols) {
-    const { data: asset } = await supabase
+    const { data: asset } = await getSupabase()
       .from('assets').select('id').eq('symbol', symbol).single()
-    if (!asset) { errors.push(`資產不�??? ${symbol}`); continue }
+    if (!asset) { errors.push(`Asset not found: ${symbol}`); continue }
 
     for (const tf of timeframes) {
       try {
         const bars = await fetchBinance(symbol, tf, safeLimit)
         const n    = await upsertBars(asset.id, tf, bars)
-        log.push(`??${symbol} ${tf}: 寫入 ${n} 筆`)
+        log.push(`[OK] ${symbol} ${tf}: ${n} bars written`)
       } catch (e) {
-        errors.push(`??${symbol} ${tf}: ${e instanceof Error ? e.message : e}`)
+        errors.push(`[ERR] ${symbol} ${tf}: ${e instanceof Error ? e.message : e}`)
       }
     }
   }
@@ -135,7 +138,7 @@ export async function GET(_req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('historical_data')
     .select('timeframe, asset_id')
 
