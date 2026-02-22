@@ -22,8 +22,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed]   = useState(false)
   const [loading, setLoading]       = useState(false)
   const [histAssets, setHistAssets] = useState<{ asset: string; count: number }[]>([])
+  const [membership, setMembership] = useState<{ remaining: number; limit: number; role: string } | null>(null)
 
-  useEffect(() => { fetchAssets() }, [])
+  useEffect(() => { fetchAssets(); fetchMembership() }, [])
+
+  async function fetchMembership() {
+    try {
+      const res  = await fetch('/api/membership')
+      const json = await res.json()
+      if (res.ok) setMembership({ remaining: json.remaining, limit: json.limit, role: json.role })
+    } catch { /* ignore */ }
+  }
 
   async function fetchAssets() {
     setLoading(true)
@@ -170,8 +179,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
           <div className="flex items-center justify-between">
             {!collapsed && (
-              <div className="pl-1">
+              <div className="pl-1 flex items-center gap-2">
                 <UserButton afterSignOutUrl="/" />
+                {membership && membership.role !== 'admin' && (
+                  <div className="flex flex-col leading-tight">
+                    <span className={cn(
+                      'text-[10px] font-black tabular-nums',
+                      membership.remaining <= 5 ? 'text-red-400' : membership.remaining <= 10 ? 'text-amber-400' : 'text-slate-300'
+                    )}>
+                      {membership.remaining}/{membership.limit}
+                    </span>
+                    <span className="text-[9px] text-slate-600">回測餘額</span>
+                  </div>
+                )}
               </div>
             )}
             <button onClick={() => setCollapsed(!collapsed)}

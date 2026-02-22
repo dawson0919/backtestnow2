@@ -7,7 +7,7 @@ import { OHLCV } from '@/lib/backtest-engine'
 export const dynamic = 'force-dynamic'
 
 const ADMIN_EMAIL = 'nbamoment@gmail.com'
-const FREE_LIMIT  = 20
+const FREE_LIMIT  = 30
 const ADV_LIMIT   = 100
 
 const supabase = createClient(

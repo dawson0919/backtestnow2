@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 
 const ADMIN_EMAIL = 'nbamoment@gmail.com'
-const FREE_LIMIT  = 20
+const FREE_LIMIT  = 30
 const ADV_LIMIT   = 100
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
