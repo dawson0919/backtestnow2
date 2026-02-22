@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 const ADMIN_EMAIL = 'nbamoment@gmail.com'
 
 const navItems = [
+  { href: '/',                   icon: 'home',      label: '回到首頁' },
   { href: '/dashboard',          icon: 'dashboard', label: '儀表板' },
   { href: '/dashboard/backtest', icon: 'tune',      label: '優化器' },
 ]
@@ -68,7 +69,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* ── Main nav (儀表板 + 優化器) ── */}
           {navItems.map(item => {
-            const isActive = item.href === '/dashboard'
+            const isActive = item.href === '/'
+              ? false
+              : item.href === '/dashboard'
               ? pathname === '/dashboard'
               : pathname.startsWith(item.href)
             return (
