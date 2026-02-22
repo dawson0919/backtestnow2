@@ -71,16 +71,14 @@ const YAHOO_SYMBOL: Record<string, string> = {
   'GC!':'GC=F', 'ES!':'ES=F', 'NQ!':'NQ=F', 'SIL!':'SI=F', 'YM!':'YM=F',
 }
 
-async function fetchYahoo(symbol: string, interval: string, days: number): Promise<OHLCV[]> {
-  const ys   = YAHOO_SYMBOL[symbol] || symbol
-  const yi   = interval === '1H' ? '60m' : interval === '1D' ? '1d' : '1wk'
-  const now  = Math.floor(Date.now() / 1000)
-  const from = now - days * 86400
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${ys}?period1=${from}&period2=${now}&interval=${yi}`
-  const res  = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-  if (!res.ok) throw new Error(`Yahoo ${res.status}`)
+interface YC { chart: { result: Array<{ timestamp: number[]; indicators: { quote: Array<{ open: number[]; high: number[]; low: number[]; close: number[]; volume: number[] }> } }> } }
 
-  interface YC { chart: { result: Array<{ timestamp: number[]; indicators: { quote: Array<{ open: number[]; high: number[]; low: number[]; close: number[]; volume: number[] }> } }> } }
+/** Fetch a single date-range window from Yahoo Finance */
+async function fetchYahooRange(yahooSym: string, fromSec: number, toSec: number, interval: string): Promise<OHLCV[]> {
+  const yi  = interval === '1H' ? '60m' : interval === '1D' ? '1d' : '1wk'
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSym}?period1=${fromSec}&period2=${toSec}&interval=${yi}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`Yahoo ${res.status} for ${yahooSym}`)
   const json = await res.json() as YC
   const r    = json?.chart?.result?.[0]
   if (!r) return []
@@ -88,6 +86,40 @@ async function fetchYahoo(symbol: string, interval: string, days: number): Promi
   return r.timestamp
     .map((ts, i) => ({ timestamp: ts * 1000, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] ?? 0 }))
     .filter(d => d.close != null && !isNaN(d.close))
+}
+
+/**
+ * Chunked Yahoo Finance fetch for intervals limited by Yahoo (e.g. 60m).
+ * Fetches 150-day windows from startDate → now, then deduplicates.
+ */
+async function fetchYahooChunked(symbol: string, interval: string, startDate: Date): Promise<OHLCV[]> {
+  const ys        = YAHOO_SYMBOL[symbol] || symbol
+  const CHUNK_MS  = 150 * 86400 * 1000   // 150-day windows
+  const allBars: OHLCV[] = []
+  let cursor = startDate.getTime()
+  const nowMs = Date.now()
+
+  while (cursor < nowMs) {
+    const windowEnd = Math.min(cursor + CHUNK_MS, nowMs)
+    try {
+      const bars = await fetchYahooRange(ys, Math.floor(cursor / 1000), Math.floor(windowEnd / 1000), interval)
+      allBars.push(...bars)
+    } catch { /* skip failed window */ }
+    await new Promise(r => setTimeout(r, 400))
+    cursor = windowEnd
+  }
+
+  // Deduplicate by timestamp
+  const map = new Map<number, OHLCV>()
+  for (const b of allBars) map.set(b.timestamp, b)
+  return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp)
+}
+
+async function fetchYahoo(symbol: string, interval: string, days: number): Promise<OHLCV[]> {
+  const ys   = YAHOO_SYMBOL[symbol] || symbol
+  const now  = Math.floor(Date.now() / 1000)
+  const from = now - days * 86400
+  return fetchYahooRange(ys, from, now, interval)
 }
 
 function aggregate4H(bars1H: OHLCV[]): OHLCV[] {
@@ -174,12 +206,12 @@ export async function POST(req: NextRequest) {
     if (!asset) { errors.push(`Asset not found: ${symbol}`); continue }
     log.push(`=== ${symbol} ===`)
 
-    // 1H: last 730 days (Yahoo max for 60m)
+    // 1H: chunked fetch from 2024-01-01 → now (bypass Yahoo's ~365d single-request limit)
     try {
-      const bars1H = await fetchYahoo(symbol, '1H', 730)
+      const bars1H = await fetchYahooChunked(symbol, '1H', new Date('2024-01-01'))
       await upsertBatch(asset.id, '1H', bars1H, log, errors)
 
-      // Re-derive 4H from all 1H bars we just got
+      // Re-derive 4H from all collected 1H bars
       const bars4H = aggregate4H(bars1H)
       await upsertBatch(asset.id, '4H', bars4H, log, errors)
     } catch (e) { errors.push(`${symbol} 1H/4H: ${e}`) }
