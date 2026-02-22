@@ -204,7 +204,30 @@ function HistoryContent() {
   const [newProjectInput, setNewProjectInput] = useState('')
   const [movingRecordId, setMovingRecordId] = useState<string | null>(null)
 
+  const paramId      = searchParams.get('id')      ?? ''
+  const paramProject = searchParams.get('project') ?? ''
+  const paramAsset   = searchParams.get('asset')   ?? ''
+
+  // Initial load
   useEffect(() => { fetchHistory() }, [])
+
+  // React to sidebar navigation (URL params change while page is already mounted)
+  useEffect(() => {
+    if (records.length === 0) return
+    if (paramId) {
+      const found = records.find(r => r.id === paramId)
+      if (found) { setSelected(found); setShowAllTrades(false) }
+    } else if (paramProject) {
+      setCatTab('project'); setCatValue(paramProject)
+      const first = records.find(r => (r.project_name || '未命名專案') === paramProject)
+      if (first) { setSelected(first); setShowAllTrades(false) }
+    } else if (paramAsset) {
+      setCatTab('asset'); setCatValue(paramAsset)
+      const first = records.find(r => r.asset === paramAsset)
+      if (first) { setSelected(first); setShowAllTrades(false) }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramId, paramProject, paramAsset])
 
   async function fetchHistory() {
     setLoading(true)
