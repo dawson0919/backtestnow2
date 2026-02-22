@@ -282,10 +282,10 @@ export default function DashboardPage() {
       </section>
 
       {/* ── Bottom grid ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
+      <div className="grid grid-cols-1 gap-8 pb-12">
 
         {/* Recent Optimization Activity */}
-        <div className="lg:col-span-2">
+        <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <span className="material-symbols-outlined text-[#3b82f6] text-[20px]">history_toggle_off</span>
@@ -344,73 +344,6 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Performance KPIs */}
-        <div className="lg:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#3b82f6] text-[20px]">analytics</span>
-              績效指標
-            </h2>
-          </div>
-          <div className="bg-[#161b1e] border border-[#2d3439] rounded-xl p-6 space-y-5">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">總資產</p>
-              <h4 className="text-3xl font-black text-white">
-                {btc && eth
-                  ? `$${((btc.price + eth.price * 2) * 0.1).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-                  : '$—'
-                }
-              </h4>
-              <p className="text-xs text-emerald-400 font-bold mt-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">arrow_upward</span>
-                +14.2% 較上月
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: '夏普比率', value: '2.45', color: 'text-[#3b82f6]' },
-                { label: '獲利因子', value: '1.82', color: 'text-emerald-400' },
-              ].map(m => (
-                <div key={m.label} className="p-3 bg-[#0a0d0f] rounded-lg border border-[#2d3439]">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">{m.label}</p>
-                  <p className={`text-xl font-black ${m.color} mt-0.5`}>{m.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="pt-3 border-t border-[#2d3439]">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">每日損益</span>
-                <span className="text-xs font-bold text-emerald-400">+$2,140.50</span>
-              </div>
-              <div className="h-2 w-full bg-[#0a0d0f] rounded-full overflow-hidden border border-[#2d3439]">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: '75%' }} />
-              </div>
-              <p className="text-[10px] text-slate-500 mt-1.5">目標達成：每日目標 75%</p>
-            </div>
-
-            {/* Quick start */}
-            <div className="pt-3 border-t border-[#2d3439]">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">快速回測</p>
-              <div className="space-y-1.5">
-                {[
-                  { label: 'BTC Dual MA', asset: 'BTCUSDT' },
-                  { label: 'GC Gold MA',  asset: 'GC!'     },
-                  { label: 'NQ Nasdaq',   asset: 'NQ!'     },
-                ].map(item => (
-                  <Link
-                    key={item.asset}
-                    href={`/dashboard/backtest?asset=${item.asset}&template=dual_ma`}
-                    className="flex items-center justify-between px-3 py-2 bg-[#0a0d0f] border border-[#2d3439] rounded-lg hover:border-[#3b82f6]/50 hover:bg-blue-600/5 transition-all group"
-                  >
-                    <span className="text-xs font-medium text-slate-300 group-hover:text-white">{item.label}</span>
-                    <span className="material-symbols-outlined text-slate-500 group-hover:text-[#3b82f6] text-[16px]">arrow_forward</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
 
