@@ -86,6 +86,7 @@ function BacktestContent() {
   const [logs, setLogs]               = useState<string[]>([])
   const [selectedResult, setSelectedResult] = useState<OptResult | null>(null)
   const [detailResult, setDetailResult]     = useState<OptResult | null>(null)
+  const [savedHistoryId, setSavedHistoryId] = useState<string | null>(null)
   const [showExport, setShowExport]   = useState(false)
   const [exportedCode, setExportedCode] = useState('')
   const [activeTab, setActiveTab]     = useState<'editor'|'results'>('editor')
@@ -118,22 +119,36 @@ function BacktestContent() {
       .finally(() => setBarCountLoading(false))
   }, [asset, timeframe])
 
-  // Auto-load strategy from ?strategy=id URL param
+  // Auto-load strategy from URL params
   useEffect(() => {
     const stratId = searchParams.get('strategy')
+    const optId   = searchParams.get('opt_id')
+
     if (stratId) {
+      // Load from user_strategies table
       fetch(`/api/strategies/${stratId}`)
         .then(r => r.json())
         .then(data => {
           if (data.strategy) {
             const s = data.strategy
-            setCode(s.code)
-            parseCode(s.code)
+            setCode(s.code); parseCode(s.code)
             setStrategyName(s.strategy_name)
             setProjectName(s.project_name)
-          } else {
-            parseCode(DUAL_MA_EXAMPLE)
-          }
+          } else { parseCode(DUAL_MA_EXAMPLE) }
+        })
+        .catch(() => parseCode(DUAL_MA_EXAMPLE))
+    } else if (optId) {
+      // Load from optimization_history table
+      fetch(`/api/save-result?id=${optId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.record?.code) {
+            const r = data.record
+            setCode(r.code); parseCode(r.code)
+            if (r.asset)        setAsset(r.asset)
+            if (r.timeframe)    setTimeframe(r.timeframe)
+            if (r.project_name) setProjectName(r.project_name)
+          } else { parseCode(DUAL_MA_EXAMPLE) }
         })
         .catch(() => parseCode(DUAL_MA_EXAMPLE))
     } else {
@@ -158,7 +173,7 @@ function BacktestContent() {
 
   async function runOptimization() {
     if (!code.trim() || running) return
-    setRunning(true); setResults([]); setProgress(0); setLogs([]); setActiveTab('results')
+    setRunning(true); setResults([]); setProgress(0); setLogs([]); setActiveTab('results'); setSavedHistoryId(null)
     const parsed = parsePineScript(code)
     addLog(`Fetching ${asset} ${timeframe} data (all available bars)...`)
     const iv = setInterval(() => setProgress(p => Math.min(p + Math.random() * 7, 90)), 350)
@@ -186,7 +201,7 @@ function BacktestContent() {
         if (data.timedOut) addLog(`⚠️  Timeout: returned partial results (${data.totalResults} found before 50s limit).`)
         addLog(`🏆 Best: Return ${formatPercent(b.totalReturnPct)}, Sharpe ${b.sharpeRatio}, WinRate ${b.winRate.toFixed(1)}%`)
         if (user?.id) {
-          await fetch('/api/save-result', {
+          const saveRes = await fetch('/api/save-result', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -212,6 +227,8 @@ function BacktestContent() {
               })),
             }),
           })
+          const saveData = await saveRes.json()
+          if (saveData.id) setSavedHistoryId(saveData.id)
           addLog('💾 Saved to history.')
         }
       } else {
@@ -795,6 +812,13 @@ function BacktestContent() {
 
             {/* Footer buttons */}
             <div className="p-5 border-t border-[#2d3439] flex gap-3">
+              {savedHistoryId && (
+                <a href={`/dashboard/history?id=${savedHistoryId}`}
+                  className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors">
+                  <span className="material-symbols-outlined text-[16px]">bar_chart</span>
+                  查看完整報告
+                </a>
+              )}
               <button
                 onClick={() => { setDetailResult(null); applyResult(detailResult) }}
                 className="flex-1 bg-[#3b82f6] hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-900/30">

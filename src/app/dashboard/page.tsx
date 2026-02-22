@@ -226,7 +226,7 @@ export default function DashboardPage() {
             <tbody className="divide-y divide-[#2d3439]">
               {strategies.map((s, i) => (
                 <tr key={i} className="hover:bg-[#1e2227] transition-colors group cursor-pointer"
-                  onClick={() => s.id && (window.location.href = `/dashboard/history?id=${s.id}`)}>
+                  onClick={() => s.id && (window.location.href = `/dashboard/backtest?opt_id=${s.id}`)}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded ${s.color} flex items-center justify-center shrink-0`}>
@@ -263,10 +263,10 @@ export default function DashboardPage() {
                   </td>
                   <td className="px-5 py-4 text-right">
                     {s.id ? (
-                      <Link href={`/dashboard/history?id=${s.id}`}
+                      <Link href={`/dashboard/backtest?opt_id=${s.id}`}
                         className="text-[10px] font-black uppercase text-[#3b82f6] opacity-0 group-hover:opacity-100 hover:underline transition-opacity"
                         onClick={e => e.stopPropagation()}>
-                        查看報告
+                        載入編輯器
                       </Link>
                     ) : (
                       <button className="p-1 text-slate-500 hover:text-[#3b82f6] transition-colors">
@@ -338,7 +338,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-slate-500">{new Date(h.created_at).toLocaleDateString('zh-TW')} · 淨利潤 {pct >= 0 ? '+' : ''}{pct}%</p>
                         </div>
                       </div>
-                      <Link href="/dashboard/history" className="text-[10px] font-black uppercase text-[#3b82f6] hover:underline">查看報告</Link>
+                      <Link href={`/dashboard/backtest?opt_id=${h.id}`} className="text-[10px] font-black uppercase text-[#3b82f6] hover:underline">載入編輯器</Link>
                     </div>
                   )
                 })}

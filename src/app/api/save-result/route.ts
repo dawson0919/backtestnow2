@@ -83,14 +83,31 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET: list optimization history for current user
+// GET: single record by ?id=, or list for current user
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
+  const id = searchParams.get('id')
 
+  if (id) {
+    const { data, error } = await supabase
+      .from('optimization_history')
+      .select(`
+        id, asset, timeframe, code, net_profit_pct, asset_type, point_value,
+        total_return_pct, max_drawdown_pct, sharpe_ratio, win_rate,
+        profit_factor, total_trades, total_dollar_pnl, monthly_pnl,
+        trades_summary, top_params, project_name, created_at
+      `)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+    return NextResponse.json({ record: data })
+  }
+
+  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
   const { data, error } = await supabase
     .from('optimization_history')
     .select(`
@@ -104,7 +121,6 @@ export async function GET(req: NextRequest) {
     .limit(limit)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ records: data })
 }
 
