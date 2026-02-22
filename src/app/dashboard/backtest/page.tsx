@@ -85,6 +85,7 @@ function BacktestContent() {
   const [progress, setProgress]       = useState(0)
   const [logs, setLogs]               = useState<string[]>([])
   const [selectedResult, setSelectedResult] = useState<OptResult | null>(null)
+  const [detailResult, setDetailResult]     = useState<OptResult | null>(null)
   const [showExport, setShowExport]   = useState(false)
   const [exportedCode, setExportedCode] = useState('')
   const [activeTab, setActiveTab]     = useState<'editor'|'results'>('editor')
@@ -452,7 +453,7 @@ function BacktestContent() {
                   <tbody className="divide-y divide-[#1e2227]">
                     {results.map(r => (
                       <tr key={r.rank}
-                        onClick={() => setSelectedResult(r)}
+                        onClick={() => { setSelectedResult(r); setDetailResult(r) }}
                         className={cn('hover:bg-[#1e2227] cursor-pointer transition-colors group', selectedResult?.rank===r.rank && 'bg-blue-600/10')}>
                         <td className="px-3 py-2.5 text-slate-500">#{r.rank}</td>
                         {Object.values(r.result.params).map((v,i) => (
@@ -752,6 +753,62 @@ function BacktestContent() {
           </div>
         </div>
       </footer>
+
+      {/* ── KPI Detail Modal ──────────────────────────────────── */}
+      {detailResult && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4" onClick={() => setDetailResult(null)}>
+          <div className="bg-[#161b1e] border border-[#2d3439] rounded-2xl w-full max-w-lg flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-[#2d3439]">
+              <div>
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#3b82f6] text-[18px]">analytics</span>
+                  #{detailResult.rank} 詳細 KPI
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {Object.entries(detailResult.result.params).map(([k,v]) => `${k}: ${v}`).join('  |  ')}
+                </p>
+              </div>
+              <button onClick={() => setDetailResult(null)} className="text-slate-500 hover:text-slate-300 transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* KPI Grid */}
+            <div className="p-5 grid grid-cols-2 gap-3">
+              {[
+                { label: '淨利潤',   value: `${detailResult.result.totalReturnPct >= 0 ? '+' : ''}${detailResult.result.totalReturnPct.toFixed(2)}%`, color: detailResult.result.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-red-400' },
+                { label: '年化報酬', value: `${detailResult.result.annualizedReturnPct >= 0 ? '+' : ''}${detailResult.result.annualizedReturnPct.toFixed(2)}%`, color: detailResult.result.annualizedReturnPct >= 0 ? 'text-emerald-400' : 'text-red-400' },
+                { label: '最大回撤', value: `${detailResult.result.maxDrawdownPct.toFixed(2)}%`, color: 'text-red-400' },
+                { label: '夏普比率', value: String(detailResult.result.sharpeRatio), color: 'text-[#3b82f6]' },
+                { label: '勝率',     value: `${detailResult.result.winRate.toFixed(2)}%`, color: 'text-white' },
+                { label: '總交易數', value: String(detailResult.result.totalTrades), color: 'text-white' },
+                { label: '獲利因子', value: String(detailResult.result.profitFactor), color: 'text-emerald-400' },
+                { label: '平均每筆', value: `${detailResult.result.avgTradePct >= 0 ? '+' : ''}${detailResult.result.avgTradePct.toFixed(3)}%`, color: detailResult.result.avgTradePct >= 0 ? 'text-emerald-400' : 'text-red-400' },
+              ].map(m => (
+                <div key={m.label} className="bg-[#0a0d0f] rounded-xl p-4 border border-[#2d3439]">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{m.label}</span>
+                  <div className={`text-2xl font-bold mt-1 ${m.color}`}>{m.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="p-5 border-t border-[#2d3439] flex gap-3">
+              <button
+                onClick={() => { setDetailResult(null); applyResult(detailResult) }}
+                className="flex-1 bg-[#3b82f6] hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
+                <span className="material-symbols-outlined text-[16px]">code</span>
+                套用並匯出腳本
+              </button>
+              <button onClick={() => setDetailResult(null)}
+                className="px-5 bg-[#0a0d0f] border border-[#2d3439] text-slate-300 rounded-xl text-sm hover:bg-[#1e2227] transition-colors">
+                關閉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Export Modal ──────────────────────────────────────── */}
       {showExport && (
