@@ -58,16 +58,28 @@ function SparkLine({ prices, positive }: { prices: number[]; positive: boolean }
 const STRATEGY_COLORS = ['bg-blue-500/20 text-blue-400', 'bg-purple-500/20 text-purple-400', 'bg-amber-500/20 text-amber-400']
 const STRATEGY_ICONS = ['bolt', 'trending_up', 'waves']
 
+const ADMIN_EMAIL = 'nbamoment@gmail.com'
+
+interface Membership { role: 'admin'|'advanced'|'free'; count: number; limit: number; remaining: number; pending: { status: string } | null }
+
 export default function DashboardPage() {
   const { user } = useUser()
-  const [tickers, setTickers]   = useState<Ticker[]>([])
-  const [history, setHistory]   = useState<OptHist[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [seeding, setSeeding]   = useState(false)
+  const [tickers, setTickers]     = useState<Ticker[]>([])
+  const [history, setHistory]     = useState<OptHist[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [seeding, setSeeding]     = useState(false)
+  const [membership, setMembership] = useState<Membership | null>(null)
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [platformAcct, setPlatformAcct] = useState('')
+  const [submitting, setSubmitting]     = useState(false)
+  const [submitMsg, setSubmitMsg]       = useState('')
+
+  const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL
 
   useEffect(() => {
     fetchTickers()
     fetchHistory()
+    fetchMembership()
     // Auto-refresh prices every 60 seconds
     const interval = setInterval(fetchTickers, 60_000)
     return () => clearInterval(interval)
@@ -81,6 +93,30 @@ export default function DashboardPage() {
       alert(json.log?.join('\n') || '資料補充完成')
     } catch { alert('資料補充失敗') }
     setSeeding(false)
+  }
+
+  async function fetchMembership() {
+    if (!user?.id) return
+    try {
+      const res = await fetch('/api/membership')
+      if (res.ok) setMembership(await res.json())
+    } catch { /* ignore */ }
+  }
+
+  async function submitUpgrade() {
+    if (!platformAcct.trim()) return
+    setSubmitting(true); setSubmitMsg('')
+    try {
+      const res = await fetch('/api/upgrade-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platformAccount: platformAcct }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setSubmitMsg(json.error || '申請失敗'); return }
+      setSubmitMsg('申請已送出！請等待管理員審核（通常 1-2 個工作天）')
+      fetchMembership()
+    } catch { setSubmitMsg('網路錯誤，請稍後再試') }
+    finally { setSubmitting(false) }
   }
 
   async function fetchTickers() {
@@ -147,6 +183,101 @@ export default function DashboardPage() {
     <div className="p-8 space-y-8 max-w-[1400px]" style={{ fontFamily: 'Inter, sans-serif' }}>
       <OnboardingGuide />
 
+      {/* ── Membership Bar ─────────────────────────────────────── */}
+      {membership && !isAdmin && (
+        <div className="flex items-center justify-between bg-[#161b1e] border border-[#2d3439] rounded-xl px-5 py-3">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+              membership.role === 'advanced'
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+            }`}>
+              {membership.role === 'advanced' ? '進階會員' : '一般會員'}
+            </span>
+            <div className="flex-1 max-w-xs">
+              <div className="flex justify-between text-[10px] mb-1">
+                <span className="text-slate-500">本月回測次數</span>
+                <span className={membership.remaining === 0 ? 'text-red-400 font-bold' : 'text-slate-400'}>
+                  {membership.count} / {membership.limit}
+                </span>
+              </div>
+              <div className="h-1.5 bg-[#0a0d0f] rounded-full overflow-hidden border border-[#2d3439]">
+                <div className={`h-full rounded-full transition-all ${
+                  membership.remaining === 0 ? 'bg-red-500' : membership.count / membership.limit > 0.8 ? 'bg-amber-500' : 'bg-[#3b82f6]'
+                }`} style={{ width: `${Math.min(100, (membership.count / membership.limit) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+          {membership.role === 'free' && (
+            membership.pending?.status === 'pending' ? (
+              <span className="text-[10px] text-amber-400 font-semibold ml-4">審核中...</span>
+            ) : (
+              <button onClick={() => { setShowUpgrade(true); setSubmitMsg('') }}
+                className="ml-4 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-lg transition-colors shrink-0">
+                解鎖進階會員
+              </button>
+            )
+          )}
+        </div>
+      )}
+
+      {/* ── Upgrade Modal ───────────────────────────────────────── */}
+      {showUpgrade && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#161b1e] border border-[#2d3439] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-[#2d3439]">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400 text-[18px]">workspace_premium</span>
+                申請進階會員
+              </h3>
+              <button onClick={() => setShowUpgrade(false)} className="text-slate-500 hover:text-slate-300">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-[#0a0d0f] rounded-xl p-4 border border-[#2d3439] space-y-2 text-sm">
+                <div className="flex justify-between text-slate-300">
+                  <span>一般會員</span><span className="text-slate-500">每月 20 次回測</span>
+                </div>
+                <div className="flex justify-between text-amber-300 font-bold">
+                  <span>進階會員</span><span>每月 100 次回測（3 個月）</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                  交易平台帳號號碼
+                </label>
+                <input
+                  type="text"
+                  value={platformAcct}
+                  onChange={e => setPlatformAcct(e.target.value)}
+                  placeholder="請填寫您的交易平台帳號"
+                  className="w-full bg-[#0a0d0f] border border-[#2d3439] rounded-lg text-sm text-white px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500/50 placeholder:text-slate-600"
+                />
+                <p className="text-[10px] text-slate-500 mt-1.5">送出後由管理員審核，通常 1-2 個工作天內完成</p>
+              </div>
+              {submitMsg && (
+                <p className={`text-xs px-3 py-2 rounded-lg ${submitMsg.includes('送出') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {submitMsg}
+                </p>
+              )}
+            </div>
+            <div className="p-5 border-t border-[#2d3439] flex gap-3">
+              {!submitMsg.includes('送出') && (
+                <button onClick={submitUpgrade} disabled={submitting || !platformAcct.trim()}
+                  className="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 transition-colors">
+                  {submitting ? '送出中...' : '送出申請'}
+                </button>
+              )}
+              <button onClick={() => setShowUpgrade(false)}
+                className="flex-1 bg-[#0a0d0f] border border-[#2d3439] text-slate-300 rounded-xl text-sm hover:bg-[#1e2227] transition-colors py-2.5">
+                關閉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Market Summary ─────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -159,11 +290,13 @@ export default function DashboardPage() {
             </span>
           </h2>
           <div className="flex items-center gap-3">
-            <button onClick={seedData} disabled={seeding}
-              className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors border border-[#2d3439] bg-[#161b1e] px-2.5 py-1 rounded-lg">
-              <span className={`material-symbols-outlined text-[14px] ${seeding ? 'animate-spin' : ''}`}>{seeding ? 'sync' : 'cloud_download'}</span>
-              {seeding ? '補充中...' : '補充歷史資料'}
-            </button>
+            {isAdmin && (
+              <button onClick={seedData} disabled={seeding}
+                className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-300 disabled:opacity-50 transition-colors border border-[#2d3439] bg-[#161b1e] px-2.5 py-1 rounded-lg">
+                <span className={`material-symbols-outlined text-[14px] ${seeding ? 'animate-spin' : ''}`}>{seeding ? 'sync' : 'cloud_download'}</span>
+                {seeding ? '補充中...' : '補充歷史資料'}
+              </button>
+            )}
             <Link href="/dashboard/backtest" className="text-xs font-bold text-[#3b82f6] hover:underline">查看所有市場</Link>
           </div>
         </div>

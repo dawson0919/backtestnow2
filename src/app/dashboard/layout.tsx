@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { UserButton, useUser } from '@clerk/nextjs'
 import { cn } from '@/lib/utils'
+
+const ADMIN_EMAIL = 'nbamoment@gmail.com'
 
 interface SavedStrategy {
   id: string
@@ -22,6 +24,8 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname  = usePathname()
   const router    = useRouter()
+  const { user }  = useUser()
+  const isAdmin   = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL
   const [collapsed, setCollapsed]           = useState(false)
   const [strategies, setStrategies]         = useState<SavedStrategy[]>([])
   const [loadingSidebar, setLoadingSidebar] = useState(false)
@@ -198,6 +202,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
         </nav>
+
+        {/* Admin link */}
+        {isAdmin && !collapsed && (
+          <div className="px-3 pb-1">
+            <Link href="/dashboard/admin"
+              className={cn('flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-bold transition-colors',
+                pathname.startsWith('/dashboard/admin')
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'text-slate-500 hover:text-amber-300 hover:bg-amber-500/10')}>
+              <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+              管理後台
+            </Link>
+          </div>
+        )}
 
         {/* Bottom */}
         <div className="p-3 border-t border-[#2d3439] space-y-2 shrink-0">

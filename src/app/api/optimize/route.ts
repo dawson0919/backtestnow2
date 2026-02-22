@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 import { optimize, OptimizationConfig } from '@/lib/optimization'
 import { OHLCV } from '@/lib/backtest-engine'
 
 export const dynamic = 'force-dynamic'
+
+const ADMIN_EMAIL = 'nbamoment@gmail.com'
+const FREE_LIMIT  = 20
+const ADV_LIMIT   = 100
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,6 +62,37 @@ async function fetchFromDB(
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // ── Usage limit check ──────────────────────────────────────
+  const clerkUser = await currentUser()
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? ''
+  const isAdmin = email === ADMIN_EMAIL
+
+  if (!isAdmin) {
+    const month = new Date().toISOString().substring(0, 7)
+
+    const { data: roleRow } = await supabase
+      .from('user_roles').select('role, expires_at').eq('user_id', userId).maybeSingle()
+
+    let limit = FREE_LIMIT
+    if (roleRow?.role === 'advanced') {
+      const expired = roleRow.expires_at && new Date(roleRow.expires_at) <= new Date()
+      if (!expired) limit = ADV_LIMIT
+    }
+
+    const { data: usage } = await supabase
+      .from('usage_tracking').select('count').eq('user_id', userId).eq('month', month).maybeSingle()
+
+    const count = usage?.count ?? 0
+    if (count >= limit) {
+      return NextResponse.json({
+        error:     limit === FREE_LIMIT ? `已達本月免費回測上限（${FREE_LIMIT} 次）。請申請進階會員以獲得更多使用次數。` : `已達本月回測上限（${ADV_LIMIT} 次）。`,
+        limitReached: true,
+        count, limit,
+      }, { status: 429 })
+    }
+  }
+  // ──────────────────────────────────────────────────────────
 
   try {
     const { symbol, interval, pineCode, config } = await req.json() as {
