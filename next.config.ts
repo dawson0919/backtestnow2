@@ -7,8 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'img.clerk.com' },
     ],
   },
-  // yahoo-finance2 uses node.js crypto — mark as server-only
-  serverExternalPackages: ['yahoo-finance2'],
+  // yahoo-finance2 and node-cron use node.js crypto — mark as server-only
+  serverExternalPackages: ['yahoo-finance2', 'node-cron'],
 }
 
 export default nextConfig

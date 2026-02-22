@@ -1,6 +1,14 @@
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 import { SignUp } from '@clerk/nextjs'
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  const { userId } = await auth()
+
+  if (userId) {
+    redirect('/dashboard')
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0d0f] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -8,7 +16,7 @@ export default function SignUpPage() {
           <h1 className="text-3xl font-black text-white">BacktestNow</h1>
           <p className="text-slate-400 text-sm mt-2">AI 策略回測優化平台</p>
         </div>
-        <SignUp />
+        <SignUp fallbackRedirectUrl="/dashboard" />
       </div>
     </div>
   )

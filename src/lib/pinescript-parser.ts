@@ -13,7 +13,7 @@ export interface ParsedStrategy {
   params: PineScriptParam[]
   strategyName: string
   isValid: boolean
-  detectedLogic: 'dual_ma' | 'rsi' | 'bollinger' | 'macd' | 'custom'
+  detectedLogic: 'dual_ma' | 'triple_ma' | 'rsi' | 'bollinger' | 'macd' | 'custom'
 }
 
 function parseArgString(argStr: string): Record<string, string> {
@@ -145,14 +145,26 @@ export function parsePineScript(code: string): ParsedStrategy {
   // Detect strategy logic type
   let detectedLogic: ParsedStrategy['detectedLogic'] = 'custom'
   const lowerCode = code.toLowerCase()
-  if (lowerCode.includes('ta.sma') || lowerCode.includes('ta.ema') || lowerCode.includes('crossover')) {
-    detectedLogic = 'dual_ma'
-  } else if (lowerCode.includes('ta.rsi') || lowerCode.includes('rsi(')) {
+
+  // Count numeric MA period params to distinguish dual vs triple MA
+  const maPeriodParams = params.filter(p =>
+    (p.type === 'int' || p.type === 'float') &&
+    /(?:len|length|period|per|ma|ema|sma|fast|mid|slow)/i.test(p.varName)
+  )
+
+  if (lowerCode.includes('ta.rsi') || lowerCode.includes('rsi(')) {
     detectedLogic = 'rsi'
   } else if (lowerCode.includes('ta.bb(') || lowerCode.includes('bollinger')) {
     detectedLogic = 'bollinger'
   } else if (lowerCode.includes('ta.macd') || lowerCode.includes('macd')) {
     detectedLogic = 'macd'
+  } else if (lowerCode.includes('ta.sma') || lowerCode.includes('ta.ema') || lowerCode.includes('crossover') || lowerCode.includes('ta.wma')) {
+    // Triple MA: 3+ numeric MA period params → use triple alignment logic
+    if (maPeriodParams.length >= 3) {
+      detectedLogic = 'triple_ma'
+    } else {
+      detectedLogic = 'dual_ma'
+    }
   }
 
   return {
@@ -174,23 +186,44 @@ export function generateUpdatedCode(
     const newVal = newValues[param.varName]
     if (newVal === undefined) continue
 
-    // Replace default value in input() call
     const escapedVar = param.varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+    // Regex handles nested parens one level deep (e.g. options=["A","B"])
+    const inputPattern = new RegExp(
+      `(${escapedVar}\\s*=\\s*input(?:\\.(?:int|float|bool|string|source))?\\s*\\()` +
+      `([^)]*(?:\\([^)]*\\)[^)]*)*)` +
+      `(\\))`,
+      'g'
+    )
+
     if (param.type === 'int' || param.type === 'float') {
-      // Replace defval= named param or first positional arg
-      updatedCode = updatedCode.replace(
-        new RegExp(`(${escapedVar}\\s*=\\s*input(?:\\.(?:int|float))?\\s*\\()([^)]+)(\\))`, 'g'),
-        (fullMatch, prefix, args, suffix) => {
-          // Replace defval named or first positional
-          let newArgs = args.replace(/defval\s*=\s*[\d.]+/, `defval = ${newVal}`)
-          if (newArgs === args) {
-            // Replace first number (positional defval)
-            newArgs = args.replace(/^(\s*)[\d.]+/, `$1${newVal}`)
-          }
-          return `${prefix}${newArgs}${suffix}`
+      updatedCode = updatedCode.replace(inputPattern, (_full, prefix, args, suffix) => {
+        // Try named defval= first, then positional first number
+        let newArgs = args.replace(/defval\s*=\s*-?[\d.]+/, `defval=${newVal}`)
+        if (newArgs === args) {
+          newArgs = args.replace(/^(\s*)-?[\d.]+/, `$1${newVal}`)
         }
-      )
+        return `${prefix}${newArgs}${suffix}`
+      })
+    } else if (param.type === 'bool') {
+      const boolStr = String(Boolean(newVal))
+      updatedCode = updatedCode.replace(inputPattern, (_full, prefix, args, suffix) => {
+        let newArgs = args.replace(/defval\s*=\s*(true|false)/i, `defval=${boolStr}`)
+        if (newArgs === args) {
+          newArgs = args.replace(/^(\s*)(true|false)/i, `$1${boolStr}`)
+        }
+        return `${prefix}${newArgs}${suffix}`
+      })
+    } else if (param.type === 'string') {
+      const strVal = String(newVal)
+      updatedCode = updatedCode.replace(inputPattern, (_full, prefix, args, suffix) => {
+        // Replace defval="..." or defval='...' or first quoted string
+        let newArgs = args.replace(/defval\s*=\s*["'][^"']*["']/, `defval="${strVal}"`)
+        if (newArgs === args) {
+          newArgs = args.replace(/^(\s*)["'][^"']*["']/, `$1"${strVal}"`)
+        }
+        return `${prefix}${newArgs}${suffix}`
+      })
     }
   }
 

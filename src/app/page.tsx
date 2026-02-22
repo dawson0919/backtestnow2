@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import LiveAssetTicker from '@/components/LiveAssetTicker'
 
 export default function LandingPage() {
   return (
@@ -7,7 +8,7 @@ export default function LandingPage() {
       <div className="flex justify-center pt-6 px-4">
         <div className="inline-flex items-center gap-2 bg-[#1e2227] border border-[#31363a] rounded-full px-4 py-2 text-xs font-semibold text-slate-300">
           <span className="text-blue-400">✦</span>
-          2024 AI 策略優化引擎全新進化
+          2026 AI 策略優化引擎全新進化
         </div>
       </div>
 
@@ -83,30 +84,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Supported Assets */}
+      {/* Supported Assets — live prices */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
-        <h2 className="text-2xl font-black text-center mb-8">支援資產</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'BTC/USDT', sub: '比特幣', type: 'crypto', color: 'bg-amber-500/10 border-amber-500/30 text-amber-400' },
-            { label: 'ETH/USDT', sub: '以太坊', type: 'crypto', color: 'bg-blue-500/10 border-blue-500/30 text-blue-400' },
-            { label: 'SOL/USDT', sub: 'Solana', type: 'crypto', color: 'bg-purple-500/10 border-purple-500/30 text-purple-400' },
-            { label: 'BNB/USDT', sub: 'Binance Coin', type: 'crypto', color: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
-            { label: 'GC (Gold)', sub: '黃金期貨', type: 'futures', color: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
-            { label: 'NQ (Nasdaq)', sub: '納指期貨', type: 'futures', color: 'bg-blue-500/10 border-blue-500/30 text-blue-400' },
-            { label: 'ES (S&P 500)', sub: '標普期貨', type: 'futures', color: 'bg-green-500/10 border-green-500/30 text-green-400' },
-            { label: 'SIL (Silver)', sub: '白銀期貨', type: 'futures', color: 'bg-slate-400/10 border-slate-400/30 text-slate-300' },
-          ].map(a => (
-            <div
-              key={a.label}
-              className={`card-hover border rounded-xl p-4 text-center ${a.color}`}
-            >
-              <div className="font-bold text-sm">{a.label}</div>
-              <div className="text-xs text-slate-500 mt-1">{a.sub}</div>
-              <div className="text-[10px] mt-1 opacity-60 uppercase tracking-wide">{a.type}</div>
-            </div>
-          ))}
-        </div>
+        <h2 className="text-2xl font-black text-center mb-2">支援資產即時報價</h2>
+        <p className="text-slate-500 text-sm text-center mb-8">8 項可回測資產 · 即時更新</p>
+        <LiveAssetTicker />
       </section>
 
       {/* Workflow Steps */}
@@ -149,7 +131,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-[#1e2227] py-8 px-6 text-center text-xs text-slate-500">
-        <p>© 2024 BacktestNow. All rights reserved. 資料僅供參考，不構成投資建議。</p>
+        <p>© 2026 BacktestNow. All rights reserved. 資料僅供參考，不構成投資建議。</p>
       </footer>
     </div>
   )
