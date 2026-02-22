@@ -86,8 +86,8 @@ export default function LandingPage() {
 
       {/* Supported Assets — live prices */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
-        <h2 className="text-2xl font-black text-center mb-2">支援資產即時報價</h2>
-        <p className="text-slate-500 text-sm text-center mb-8">8 項可回測資產 · 即時更新</p>
+        <h2 className="text-2xl font-black text-center mb-2">支援資產報價</h2>
+        <p className="text-slate-500 text-sm text-center mb-8">8 項可回測資產 · 加密貨幣即時更新 · <span className="text-amber-500/80">期貨延遲報價</span></p>
         <LiveAssetTicker />
       </section>
 

@@ -125,6 +125,9 @@ export default function MarketsPage() {
               最後更新：{lastUpdate.toLocaleTimeString('zh-TW')}　每 60 秒自動刷新
             </p>
           )}
+          <p className="text-[10px] text-amber-500/70 mt-0.5">
+            ＊ 加密貨幣為資料庫收盤價；期貨同為資料庫數據，非即時報價
+          </p>
         </div>
         <button onClick={loadAll}
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-[#2d3439] bg-[#161b1e] px-3 py-1.5 rounded-lg transition-colors">
@@ -145,7 +148,10 @@ export default function MarketsPage() {
 
       {/* Futures */}
       <section>
-        <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">期貨</h2>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">期貨</h2>
+          <span className="text-[9px] font-bold text-amber-500/80 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">非即時・資料庫數據</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {futuresAssets.map(a => (
             <AssetCard key={a.symbol} asset={a} />

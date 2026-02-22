@@ -100,15 +100,25 @@ export default function LiveAssetTicker() {
             ) : (
               <div className="text-slate-600 text-xs mt-2 animate-pulse">載入中...</div>
             )}
-            <div className="text-[10px] mt-1 opacity-60 uppercase tracking-wide">{a.type}</div>
+            <div className="flex items-center justify-center gap-1 mt-1">
+              <span className="text-[10px] opacity-60 uppercase tracking-wide">{a.type}</span>
+              {a.type === 'futures' && (
+                <span className="text-[9px] font-bold text-amber-500/80 bg-amber-500/10 border border-amber-500/20 px-1 rounded leading-none py-0.5">延遲</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
-      {lastUpdated && (
-        <p className="text-center text-[11px] text-slate-600 mt-3">
-          更新於 {new Date(lastUpdated).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} · 每 60 秒自動刷新
+      <div className="mt-3 space-y-1 text-center">
+        {lastUpdated && (
+          <p className="text-[11px] text-slate-600">
+            加密貨幣更新於 {new Date(lastUpdated).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} · 每 60 秒自動刷新
+          </p>
+        )}
+        <p className="text-[10px] text-slate-700">
+          ＊ 期貨報價約有 15 分鐘延遲；收市後顯示前一交易日收盤價
         </p>
-      )}
+      </div>
     </div>
   )
 }
