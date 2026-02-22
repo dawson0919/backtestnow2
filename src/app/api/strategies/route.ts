@@ -84,7 +84,46 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, id: data?.id })
 }
 
-// DELETE /api/strategies?id=... ??delete a strategy
+// PATCH /api/strategies
+// Rename single strategy:   { id, strategyName?, projectName? }
+// Bulk rename project:      { oldProjectName, newProjectName }
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json() as {
+    id?: string; strategyName?: string; projectName?: string
+    oldProjectName?: string; newProjectName?: string
+  }
+
+  if (body.oldProjectName !== undefined && body.newProjectName !== undefined) {
+    const { error } = await supabase
+      .from('user_strategies')
+      .update({ project_name: body.newProjectName.trim() || '未命名專案' })
+      .eq('user_id', userId)
+      .eq('project_name', body.oldProjectName)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  const { id, strategyName, projectName } = body
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+  const updates: Record<string, string> = { updated_at: new Date().toISOString() }
+  if (strategyName?.trim()) updates.strategy_name = strategyName.trim()
+  if (projectName?.trim()) updates.project_name = projectName.trim()
+
+  const { error } = await supabase
+    .from('user_strategies')
+    .update(updates)
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+
+// DELETE /api/strategies?id=... — delete a strategy
 export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

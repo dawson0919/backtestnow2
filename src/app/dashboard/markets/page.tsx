@@ -80,17 +80,17 @@ export default function MarketsPage() {
       const json = await res.json() as { data: { open: number; high: number; low: number; close: number; volume: number }[] }
       if (!res.ok || !json.data?.length) throw new Error('no data')
 
-      const data  = json.data
-      const last  = data[data.length - 1]
-      const prev  = data[data.length - 2]
-      const price = last.close
-      const chg   = ((price - prev.close) / prev.close) * 100
+      const data    = json.data
+      const last    = data[data.length - 1]
+      const prevBar = data[data.length - 2]
+      const price   = last.close
+      const chg     = ((price - prevBar.close) / prevBar.close) * 100
 
-      setAssets(prev => prev.map((x, i) => i === idx ? {
+      setAssets(cur => cur.map((x, i) => i === idx ? {
         ...x,
         price,
         change:    chg,
-        changeAbs: price - prev.close,
+        changeAbs: price - prevBar.close,
         high:      last.high,
         low:       last.low,
         volume:    last.volume,

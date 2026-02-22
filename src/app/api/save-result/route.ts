@@ -124,7 +124,44 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ records: data })
 }
 
-// DELETE /api/save-result?id=... ??delete one optimization record
+// PATCH /api/save-result
+// Single record:  { id, projectName }
+// Bulk rename:    { oldProjectName, newProjectName }
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json() as {
+    id?: string; projectName?: string
+    oldProjectName?: string; newProjectName?: string
+  }
+
+  // Bulk project rename
+  if (body.oldProjectName !== undefined && body.newProjectName !== undefined) {
+    const { error } = await supabase
+      .from('optimization_history')
+      .update({ project_name: body.newProjectName.trim() || '未命名專案' })
+      .eq('user_id', userId)
+      .eq('project_name', body.oldProjectName)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  // Single record rename / move
+  const { id, projectName } = body
+  if (!id || !projectName?.trim()) return NextResponse.json({ error: 'Missing id or projectName' }, { status: 400 })
+
+  const { error } = await supabase
+    .from('optimization_history')
+    .update({ project_name: projectName.trim() })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+
+// DELETE /api/save-result?id=... — delete one optimization record
 export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

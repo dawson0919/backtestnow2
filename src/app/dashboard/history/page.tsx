@@ -196,6 +196,13 @@ function HistoryContent() {
   const [catValue, setCatValue]             = useState<string>('')
   const [deletingId, setDeletingId]         = useState<string | null>(null)
   const [searchQ, setSearchQ]               = useState('')
+  // Project folder management
+  const [folderRenaming, setFolderRenaming] = useState<string | null>(null)
+  const [folderRenameVal, setFolderRenameVal] = useState('')
+  const [localProjects, setLocalProjects]   = useState<string[]>([])
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [newProjectInput, setNewProjectInput] = useState('')
+  const [movingRecordId, setMovingRecordId] = useState<string | null>(null)
 
   useEffect(() => { fetchHistory() }, [])
 
@@ -206,8 +213,15 @@ function HistoryContent() {
       const json = await res.json() as { records: OptHist[] }
       const data = json.records || []
       setRecords(data)
+      // initialise localProjects from records
+      const names = Array.from(new Set(data.map(r => r.project_name || '未命名專案')))
+      setLocalProjects(prev => {
+        const extra = prev.filter(p => !names.includes(p))
+        return [...names, ...extra]
+      })
       const targetId      = searchParams.get('id')
       const targetProject = searchParams.get('project')
+      const targetAsset   = searchParams.get('asset')
       if (targetId) {
         const found = data.find(r => r.id === targetId)
         setSelected(found ?? data[0] ?? null)
@@ -216,11 +230,69 @@ function HistoryContent() {
         setCatValue(targetProject)
         const first = data.find(r => (r.project_name || '未命名專案') === targetProject)
         setSelected(first ?? data[0] ?? null)
+      } else if (targetAsset) {
+        setCatTab('asset')
+        setCatValue(targetAsset)
+        const first = data.find(r => r.asset === targetAsset)
+        setSelected(first ?? data[0] ?? null)
       } else if (data.length > 0) {
         setSelected(data[0])
       }
     } catch { /* ignore */ }
     setLoading(false)
+  }
+
+  async function renameProjectGroup(oldName: string, newName: string) {
+    const trimmed = newName.trim() || '未命名專案'
+    await fetch('/api/save-result', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldProjectName: oldName, newProjectName: trimmed }),
+    })
+    setRecords(prev => prev.map(r => (r.project_name || '未命名專案') === oldName ? { ...r, project_name: trimmed } : r))
+    setLocalProjects(prev => prev.map(p => p === oldName ? trimmed : p))
+    if (catValue === oldName) setCatValue(trimmed)
+    setFolderRenaming(null)
+  }
+
+  async function deleteProjectGroup(name: string) {
+    const count = records.filter(r => (r.project_name || '未命名專案') === name).length
+    const msg = count > 0
+      ? `刪除專案「${name}」將把 ${count} 筆記錄移至「未命名專案」，確定繼續？`
+      : `確定刪除空專案「${name}」？`
+    if (!confirm(msg)) return
+    if (count > 0) {
+      await fetch('/api/save-result', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldProjectName: name, newProjectName: '未命名專案' }),
+      })
+      setRecords(prev => prev.map(r => (r.project_name || '未命名專案') === name ? { ...r, project_name: '未命名專案' } : r))
+    }
+    setLocalProjects(prev => prev.filter(p => p !== name))
+    if (catValue === name) setCatValue('')
+  }
+
+  async function moveRecord(id: string, targetProject: string) {
+    await fetch('/api/save-result', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, projectName: targetProject }),
+    })
+    setRecords(prev => prev.map(r => r.id === id ? { ...r, project_name: targetProject } : r))
+    setMovingRecordId(null)
+  }
+
+  function createProject() {
+    const name = newProjectInput.trim()
+    if (!name) return
+    if (!localProjects.includes(name)) {
+      setLocalProjects(prev => [name, ...prev])
+    }
+    setShowNewProject(false)
+    setNewProjectInput('')
+    setCatTab('project')
+    setCatValue(name)
   }
 
   async function deleteRecord(id: string) {
@@ -294,13 +366,25 @@ function HistoryContent() {
     })
   }, [selected])
 
-  // ── Category groups for sidebar ───────────────────────────────────────────
-  const catGroups = useMemo(() => {
-    if (catTab === 'all') return []
-    const key = catTab === 'project' ? 'project_name' : catTab === 'asset' ? 'asset' : 'asset_type'
+  // ── Project groups (always computed) ──────────────────────────────────────
+  const projectGroups = useMemo(() => {
     const counts: Record<string, number> = {}
     records.forEach(r => {
-      const v = String((r as unknown as Record<string, unknown>)[key] || '未命名專案')
+      const v = r.project_name || '未命名專案'
+      counts[v] = (counts[v] || 0) + 1
+    })
+    // Include locally created empty projects
+    localProjects.forEach(p => { if (!(p in counts)) counts[p] = 0 })
+    return Object.entries(counts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count)
+  }, [records, localProjects])
+
+  // ── Other category groups (asset / type tabs) ──────────────────────────────
+  const catGroups = useMemo(() => {
+    if (catTab === 'all' || catTab === 'project') return []
+    const key = catTab === 'asset' ? 'asset' : 'asset_type'
+    const counts: Record<string, number> = {}
+    records.forEach(r => {
+      const v = String((r as unknown as Record<string, unknown>)[key] || '—')
       counts[v] = (counts[v] || 0) + 1
     })
     return Object.entries(counts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count)
@@ -398,7 +482,8 @@ function HistoryContent() {
   }
 
   return (
-    <div className="min-h-full bg-[#080a0c]" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-full bg-[#080a0c]" style={{ fontFamily: 'Inter, sans-serif' }}
+      onClick={() => { if (movingRecordId) setMovingRecordId(null) }}>
 
       {/* ── Sticky Header ──────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 border-b border-[#2d3439] bg-[#0a0d0f]/90 backdrop-blur px-6 lg:px-10 py-4">
@@ -918,9 +1003,10 @@ function HistoryContent() {
 
         {/* ── All Records Table ──────────────────────────────────────── */}
         <section className="bg-[#0a0d0f] border border-[#2d3439] rounded-xl overflow-hidden">
-          {/* Category tab nav */}
+          {/* Top bar */}
           <div className="flex items-center border-b border-[#2d3439]">
-            {([['all','所有'],['project','依專案'],['asset','依資產'],['type','依類型']] as const).map(([key, label]) => (
+            {/* Sub-filter tabs (非 project 視圖) */}
+            {([['all','所有'],['asset','依資產'],['type','依類型']] as const).map(([key, label]) => (
               <button key={key}
                 onClick={() => { setCatTab(key); setCatValue('') }}
                 className={`px-5 py-3.5 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap ${catTab === key ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
@@ -945,7 +1031,7 @@ function HistoryContent() {
                 )}
               </div>
               <span className="text-[11px] text-slate-600 font-mono">
-                {filteredRecords.length}{catTab !== 'all' && filteredRecords.length !== records.length ? ` / ${records.length}` : ''} 筆
+                {filteredRecords.length}{filteredRecords.length !== records.length ? ` / ${records.length}` : ''} 筆
               </span>
               <button onClick={fetchHistory} title="重新整理"
                 className="text-slate-600 hover:text-slate-400 transition-colors">
@@ -955,25 +1041,116 @@ function HistoryContent() {
           </div>
 
           <div className="flex">
-            {/* Left category sidebar */}
-            {catTab !== 'all' && (
-              <aside className="w-44 shrink-0 border-r border-[#2d3439] py-2 overflow-y-auto" style={{ maxHeight: 560 }}>
-                <button
-                  onClick={() => setCatValue('')}
-                  className={`w-full text-left px-4 py-2 text-xs font-semibold flex items-center justify-between transition-colors ${catValue === '' ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}>
-                  <span>全部</span>
-                  <span className="text-[10px] bg-[#1e2227] text-slate-600 rounded px-1.5">{records.length}</span>
-                </button>
-                {catGroups.map(g => (
-                  <button key={g.label}
-                    onClick={() => setCatValue(g.label)}
-                    className={`w-full text-left px-4 py-2 text-xs font-medium flex items-center justify-between gap-1.5 transition-colors ${catValue === g.label ? 'text-blue-400 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300 hover:bg-[#161b1e]'}`}>
-                    <span className="truncate">{g.label}</span>
-                    <span className="text-[10px] bg-[#1e2227] text-slate-600 rounded px-1.5 shrink-0">{g.count}</span>
-                  </button>
+            {/* ── Left project sidebar (always visible) ── */}
+            <aside className="w-52 shrink-0 border-r border-[#2d3439] flex flex-col" style={{ maxHeight: 560 }}>
+              {/* All / non-project filter button */}
+              <button
+                onClick={() => { setCatTab('all'); setCatValue('') }}
+                className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b border-[#1e2227] transition-colors ${catTab === 'all' && catValue === '' ? 'text-blue-400 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'}`}>
+                <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                <span className="flex-1">全部</span>
+                <span className="text-[10px] bg-[#1e2227] text-slate-600 rounded px-1.5">{records.length}</span>
+              </button>
+
+              {/* Project folders */}
+              <div className="flex-1 overflow-y-auto py-1">
+                <p className="px-4 pt-2 pb-1 text-[9px] font-black uppercase tracking-widest text-slate-600">專案資料夾</p>
+                {projectGroups.map(g => (
+                  <div key={g.label} className="group relative">
+                    {folderRenaming === g.label ? (
+                      <div className="px-3 py-1.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px] text-slate-600 shrink-0">drive_file_rename_outline</span>
+                        <input
+                          autoFocus
+                          value={folderRenameVal}
+                          onChange={e => setFolderRenameVal(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') renameProjectGroup(g.label, folderRenameVal)
+                            if (e.key === 'Escape') setFolderRenaming(null)
+                          }}
+                          className="flex-1 text-[11px] bg-[#0a0d0f] border border-[#3b82f6]/50 rounded px-1.5 py-0.5 text-white focus:outline-none min-w-0"
+                        />
+                        <button onClick={() => renameProjectGroup(g.label, folderRenameVal)} className="text-emerald-400 hover:text-emerald-300 shrink-0">
+                          <span className="material-symbols-outlined text-[13px]">check</span>
+                        </button>
+                        <button onClick={() => setFolderRenaming(null)} className="text-slate-500 hover:text-slate-300 shrink-0">
+                          <span className="material-symbols-outlined text-[13px]">close</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setCatTab('project'); setCatValue(g.label) }}
+                        className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors ${catTab === 'project' && catValue === g.label ? 'text-blue-400 bg-blue-500/5 border-l-2 border-blue-500' : 'text-slate-500 hover:text-slate-300 hover:bg-[#161b1e] border-l-2 border-transparent'}`}>
+                        <span className="material-symbols-outlined text-[13px] text-slate-600 shrink-0">folder</span>
+                        <span className="flex-1 truncate">{g.label}</span>
+                        {/* Count hidden on hover; action buttons appear */}
+                        <span className="text-[10px] bg-[#1e2227] text-slate-600 rounded px-1.5 shrink-0 group-hover:hidden">{g.count}</span>
+                        <div className="hidden group-hover:flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                          <button
+                            title="重新命名"
+                            onClick={() => { setFolderRenaming(g.label); setFolderRenameVal(g.label) }}
+                            className="p-0.5 text-slate-600 hover:text-blue-400 transition-colors">
+                            <span className="material-symbols-outlined text-[12px]">edit</span>
+                          </button>
+                          <button
+                            title="刪除專案"
+                            onClick={() => deleteProjectGroup(g.label)}
+                            className="p-0.5 text-slate-600 hover:text-red-400 transition-colors">
+                            <span className="material-symbols-outlined text-[12px]">delete</span>
+                          </button>
+                        </div>
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </aside>
-            )}
+
+                {/* Non-project cat groups (asset / type) */}
+                {catGroups.length > 0 && (
+                  <>
+                    <p className="px-4 pt-3 pb-1 text-[9px] font-black uppercase tracking-widest text-slate-600">
+                      {catTab === 'asset' ? '資產' : '類型'}
+                    </p>
+                    {catGroups.map(g => (
+                      <button key={g.label}
+                        onClick={() => setCatValue(g.label)}
+                        className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center justify-between gap-1.5 transition-colors border-l-2 ${catValue === g.label ? 'text-blue-400 bg-blue-500/5 border-blue-500' : 'text-slate-500 hover:text-slate-300 hover:bg-[#161b1e] border-transparent'}`}>
+                        <span className="truncate">{g.label}</span>
+                        <span className="text-[10px] bg-[#1e2227] text-slate-600 rounded px-1.5 shrink-0">{g.count}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {/* New project button */}
+              <div className="border-t border-[#1e2227] p-2">
+                {showNewProject ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={newProjectInput}
+                      onChange={e => setNewProjectInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') createProject(); if (e.key === 'Escape') setShowNewProject(false) }}
+                      placeholder="專案名稱..."
+                      className="flex-1 text-[11px] bg-[#0a0d0f] border border-[#3b82f6]/50 rounded px-2 py-1 text-white focus:outline-none placeholder:text-slate-600 min-w-0"
+                    />
+                    <button onClick={createProject} className="text-emerald-400 hover:text-emerald-300 shrink-0">
+                      <span className="material-symbols-outlined text-[14px]">check</span>
+                    </button>
+                    <button onClick={() => setShowNewProject(false)} className="text-slate-500 hover:text-slate-300 shrink-0">
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowNewProject(true)}
+                    className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:text-slate-300 hover:bg-[#161b1e] rounded-lg transition-colors">
+                    <span className="material-symbols-outlined text-[14px]">create_new_folder</span>
+                    新增專案
+                  </button>
+                )}
+              </div>
+            </aside>
 
             {/* Records table */}
             <div className="flex-1 min-w-0">
@@ -1032,14 +1209,39 @@ function HistoryContent() {
                             <td className="px-4 py-3 text-sm text-red-400">{r.max_drawdown_pct ? `-${r.max_drawdown_pct.toFixed(1)}%` : '—'}</td>
                             <td className="px-4 py-3 text-sm text-slate-400">{r.total_trades ?? '—'}</td>
                             <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{new Date(r.created_at).toLocaleDateString('zh-TW')}</td>
-                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <td className="px-4 py-3 relative" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   onClick={() => { setSelected(r); setShowCode(true) }}
                                   className="text-[10px] font-black uppercase text-[#3b82f6] hover:underline whitespace-nowrap">
-                                  View
+                                  匯出
                                 </button>
                                 <span className="text-slate-700">·</span>
+                                {/* Move to project */}
+                                <div className="relative">
+                                  <button
+                                    title="移動到專案"
+                                    onClick={() => setMovingRecordId(movingRecordId === r.id ? null : r.id)}
+                                    className="text-slate-500 hover:text-blue-400 transition-colors flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[14px]">drive_file_move</span>
+                                  </button>
+                                  {movingRecordId === r.id && (
+                                    <div className="absolute right-0 bottom-full mb-1 z-30 bg-[#1e2227] border border-[#2d3439] rounded-lg shadow-xl py-1 min-w-[150px]">
+                                      <p className="px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-600">移動到專案</p>
+                                      {projectGroups.map(p => (
+                                        <button key={p.label}
+                                          onClick={() => moveRecord(r.id, p.label)}
+                                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${(r.project_name || '未命名專案') === p.label ? 'text-blue-400 bg-blue-500/5' : 'text-slate-300 hover:bg-[#2d3439]'}`}>
+                                          <span className="material-symbols-outlined text-[12px] text-slate-600">folder</span>
+                                          <span className="truncate">{p.label}</span>
+                                          {(r.project_name || '未命名專案') === p.label && (
+                                            <span className="material-symbols-outlined text-[12px] text-blue-400 ml-auto">check</span>
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                                 <button
                                   onClick={() => deleteRecord(r.id)}
                                   disabled={isDeleting}

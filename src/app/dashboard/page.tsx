@@ -19,6 +19,7 @@ interface OptHist {
   asset: string
   timeframe: string
   net_profit_pct: string
+  project_name: string
   created_at: string
 }
 
@@ -73,6 +74,9 @@ export default function DashboardPage() {
   const [platformAcct, setPlatformAcct] = useState('')
   const [submitting, setSubmitting]     = useState(false)
   const [submitMsg, setSubmitMsg]       = useState('')
+  const [editingId, setEditingId]       = useState<string | null>(null)
+  const [editName, setEditName]         = useState('')
+  const [deletingId, setDeletingId]     = useState<string | null>(null)
 
   const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL
 
@@ -119,6 +123,26 @@ export default function DashboardPage() {
     finally { setSubmitting(false) }
   }
 
+  async function renameProject(id: string) {
+    if (!editName.trim()) return
+    await fetch('/api/save-result', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, projectName: editName.trim() }),
+    })
+    setHistory(prev => prev.map(h => h.id === id ? { ...h, net_profit_pct: h.net_profit_pct } : h))
+    // refetch to get updated name
+    setEditingId(null)
+    fetchHistory()
+  }
+
+  async function deleteProject(id: string) {
+    setDeletingId(id)
+    await fetch(`/api/save-result?id=${id}`, { method: 'DELETE' })
+    setHistory(prev => prev.filter(h => h.id !== id))
+    setDeletingId(null)
+  }
+
   async function fetchTickers() {
     setLoading(true)
     const results: Ticker[] = []
@@ -148,10 +172,10 @@ export default function DashboardPage() {
     if (!user?.id) return
     const { data } = await supabase
       .from('optimization_history')
-      .select('id, asset, timeframe, net_profit_pct, created_at')
+      .select('id, asset, timeframe, net_profit_pct, project_name, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(6)
+      .limit(20)
     if (data) setHistory(data)
   }
 
@@ -162,9 +186,10 @@ export default function DashboardPage() {
   const nq  = tickers.find(t => t.symbol === 'NQ!')
 
   // Strategy rows from history or placeholder
-  const strategies = history.length > 0 ? history.slice(0, 3).map((h, i) => ({
+  const strategies = history.length > 0 ? history.map((h, i) => ({
     id: h.id,
-    name: h.net_profit_pct ? `${h.asset} 策略` : `${h.asset} 策略`,
+    name: h.project_name || `${h.asset} 策略`,
+    projectName: h.project_name,
     pair: `${h.asset} · ${h.timeframe}`,
     status: 'BACKTEST',
     winRate: Math.round(50 + Math.random() * 25),
@@ -174,9 +199,9 @@ export default function DashboardPage() {
     color: STRATEGY_COLORS[i % 3],
     icon: STRATEGY_ICONS[i % 3],
   })) : [
-    { id: null, name: 'Dual MA Crossover', pair: 'BTC/USDT · 1D', status: 'LIVE',    winRate: 66, profit: '+$12,430', profitPositive: true,  drawdown: '4.2%', color: STRATEGY_COLORS[0], icon: STRATEGY_ICONS[0] },
-    { id: null, name: 'EMA Trend Follower', pair: 'ETH/USDT · 4H',status: 'TESTING', winRate: 54, profit: '+$8,211',  profitPositive: true,  drawdown: '2.1%', color: STRATEGY_COLORS[1], icon: STRATEGY_ICONS[1] },
-    { id: null, name: 'Gold Scalper v2',    pair: 'GC · 1H',       status: 'LIVE',    winRate: 72, profit: '+$24,190', profitPositive: true,  drawdown: '8.5%', color: STRATEGY_COLORS[2], icon: STRATEGY_ICONS[2] },
+    { id: null, projectName: null, name: 'Dual MA Crossover', pair: 'BTC/USDT · 1D', status: 'LIVE',    winRate: 66, profit: '+$12,430', profitPositive: true,  drawdown: '4.2%', color: STRATEGY_COLORS[0], icon: STRATEGY_ICONS[0] },
+    { id: null, projectName: null, name: 'EMA Trend Follower', pair: 'ETH/USDT · 4H',status: 'TESTING', winRate: 54, profit: '+$8,211',  profitPositive: true,  drawdown: '2.1%', color: STRATEGY_COLORS[1], icon: STRATEGY_ICONS[1] },
+    { id: null, projectName: null, name: 'Gold Scalper v2',    pair: 'GC · 1H',       status: 'LIVE',    winRate: 72, profit: '+$24,190', profitPositive: true,  drawdown: '8.5%', color: STRATEGY_COLORS[2], icon: STRATEGY_ICONS[2] },
   ]
 
   return (
@@ -342,6 +367,11 @@ export default function DashboardPage() {
             <span className="material-symbols-outlined text-[#3b82f6] text-[20px]">robot_2</span>
             策略概覽
           </h2>
+          <Link href="/dashboard/backtest"
+            className="flex items-center gap-1.5 text-xs font-bold bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20 border border-[#3b82f6]/30 text-[#3b82f6] px-3 py-1.5 rounded-lg transition-colors">
+            <span className="material-symbols-outlined text-[14px]">add</span>
+            新增策略
+          </Link>
         </div>
 
         <div className="bg-[#161b1e] border border-[#2d3439] rounded-xl overflow-hidden">
@@ -358,15 +388,33 @@ export default function DashboardPage() {
             </thead>
             <tbody className="divide-y divide-[#2d3439]">
               {strategies.map((s, i) => (
-                <tr key={i} className="hover:bg-[#1e2227] transition-colors group cursor-pointer"
-                  onClick={() => s.id && (window.location.href = `/dashboard/backtest?opt_id=${s.id}`)}>
+                <tr key={s.id ?? i} className="hover:bg-[#1e2227] transition-colors group cursor-pointer"
+                  onClick={() => s.id && editingId !== s.id && (window.location.href = `/dashboard/history?id=${s.id}`)}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded ${s.color} flex items-center justify-center shrink-0`}>
                         <span className="material-symbols-outlined text-[18px]">{s.icon}</span>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">{s.name}</p>
+                      <div className="flex-1 min-w-0">
+                        {editingId === s.id ? (
+                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') renameProject(s.id!); if (e.key === 'Escape') setEditingId(null) }}
+                              className="text-sm font-bold bg-[#0a0d0f] border border-[#3b82f6]/50 rounded px-2 py-0.5 text-white focus:outline-none w-40"
+                            />
+                            <button onClick={() => renameProject(s.id!)} className="text-emerald-400 hover:text-emerald-300">
+                              <span className="material-symbols-outlined text-[16px]">check</span>
+                            </button>
+                            <button onClick={() => setEditingId(null)} className="text-slate-500 hover:text-slate-300">
+                              <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-white truncate">{s.name}</p>
+                        )}
                         <p className="text-xs text-slate-500">{s.pair}</p>
                       </div>
                     </div>
@@ -396,11 +444,21 @@ export default function DashboardPage() {
                   </td>
                   <td className="px-5 py-4 text-right">
                     {s.id ? (
-                      <Link href={`/dashboard/backtest?opt_id=${s.id}`}
-                        className="text-[10px] font-black uppercase text-[#3b82f6] opacity-0 group-hover:opacity-100 hover:underline transition-opacity"
-                        onClick={e => e.stopPropagation()}>
-                        載入編輯器
-                      </Link>
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                        <button
+                          title="重新命名"
+                          onClick={() => { setEditingId(s.id!); setEditName(s.name) }}
+                          className="p-1 text-slate-500 hover:text-[#3b82f6] transition-colors">
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                        </button>
+                        <button
+                          title="刪除"
+                          disabled={deletingId === s.id}
+                          onClick={() => { if (confirm(`確定刪除「${s.name}」？此操作無法還原。`)) deleteProject(s.id!) }}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors disabled:opacity-40">
+                          <span className="material-symbols-outlined text-[16px]">{deletingId === s.id ? 'sync' : 'delete'}</span>
+                        </button>
+                      </div>
                     ) : (
                       <button className="p-1 text-slate-500 hover:text-[#3b82f6] transition-colors">
                         <span className="material-symbols-outlined text-[20px]">more_vert</span>
@@ -471,7 +529,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-slate-500">{new Date(h.created_at).toLocaleDateString('zh-TW')} · 淨利潤 {pct >= 0 ? '+' : ''}{pct}%</p>
                         </div>
                       </div>
-                      <Link href={`/dashboard/backtest?opt_id=${h.id}`} className="text-[10px] font-black uppercase text-[#3b82f6] hover:underline">載入編輯器</Link>
+                      <Link href={`/dashboard/history?id=${h.id}`} className="text-[10px] font-black uppercase text-[#3b82f6] hover:underline">查看報告</Link>
                     </div>
                   )
                 })}
