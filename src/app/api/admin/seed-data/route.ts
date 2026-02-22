@@ -3,11 +3,13 @@
  * Fetch and upsert historical OHLCV data into Supabase.
  * Requires auth (no admin-role table needed).
  * POST { symbols?: string[], timeframes?: string[], limit?: number }
- * limit can exceed 1000 — will page through Binance API automatically.
+ * limit can exceed 1000 ??will page through Binance API automatically.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
+
+export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,15 +115,15 @@ export async function POST(req: NextRequest) {
   for (const symbol of symbols) {
     const { data: asset } = await supabase
       .from('assets').select('id').eq('symbol', symbol).single()
-    if (!asset) { errors.push(`資產不存在: ${symbol}`); continue }
+    if (!asset) { errors.push(`資產不�??? ${symbol}`); continue }
 
     for (const tf of timeframes) {
       try {
         const bars = await fetchBinance(symbol, tf, safeLimit)
         const n    = await upsertBars(asset.id, tf, bars)
-        log.push(`✅ ${symbol} ${tf}: 寫入 ${n} 筆`)
+        log.push(`??${symbol} ${tf}: 寫入 ${n} 筆`)
       } catch (e) {
-        errors.push(`❌ ${symbol} ${tf}: ${e instanceof Error ? e.message : e}`)
+        errors.push(`??${symbol} ${tf}: ${e instanceof Error ? e.message : e}`)
       }
     }
   }

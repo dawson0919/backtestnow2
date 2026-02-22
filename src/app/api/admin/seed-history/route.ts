@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -20,7 +22,7 @@ interface OHLCV {
   timestamp: number; open: number; high: number; low: number; close: number; volume: number
 }
 
-// â”€â”€â”€ Binance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€ Binance ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 const BINANCE_IV: Record<string, string> = { '1H':'1h', '4H':'4h', '1D':'1d' }
 
 async function fetchBinance(symbol: string, interval: string, limit = 1000): Promise<OHLCV[]> {
@@ -38,7 +40,7 @@ async function fetchBinance(symbol: string, interval: string, limit = 1000): Pro
   }))
 }
 
-// â”€â”€â”€ Yahoo Finance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€?€ Yahoo Finance ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 const YAHOO_SYMBOL: Record<string, string> = {
   'GC!':'GC=F', 'ES!':'ES=F', 'NQ!':'NQ=F', 'SIL!':'SI=F', 'YM!':'YM=F',
 }
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
   const log: string[] = []
   const errors: string[] = []
 
-  // â”€â”€â”€ Crypto: BTC, ETH, SOL, BNB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€?€ Crypto: BTC, ETH, SOL, BNB ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
   const cryptoSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
 
   for (const symbol of cryptoSymbols) {
@@ -119,26 +121,26 @@ export async function POST(req: NextRequest) {
     if (!asset) { errors.push(`Asset not found: ${symbol}`); continue }
     log.push(`=== ${symbol} ===`)
 
-    // 1D: 1000 bars â‰ˆ 2.7 years
+    // 1D: 1000 bars ??2.7 years
     try {
       const bars = await fetchBinance(symbol, '1D', 1000)
       await upsertBatch(asset.id, '1D', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 1D: ${e}`) }
 
-    // 4H: 1000 bars â‰ˆ 167 days
+    // 4H: 1000 bars ??167 days
     try {
       const bars = await fetchBinance(symbol, '4H', 1000)
       await upsertBatch(asset.id, '4H', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 4H: ${e}`) }
 
-    // 1H: 1000 bars â‰ˆ 42 days (already have some, this tops up)
+    // 1H: 1000 bars ??42 days (already have some, this tops up)
     try {
       const bars = await fetchBinance(symbol, '1H', 1000)
       await upsertBatch(asset.id, '1H', bars, log, errors)
     } catch (e) { errors.push(`${symbol} 1H: ${e}`) }
   }
 
-  // â”€â”€â”€ Futures: already have good history; refresh last 30 days â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?€?€?€ Futures: already have good history; refresh last 30 days ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
   const futuresSymbols = ['GC!', 'ES!', 'NQ!', 'SIL!', 'YM!']
 
   for (const symbol of futuresSymbols) {

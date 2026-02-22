@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import { optimize, OptimizationConfig } from '@/lib/optimization'
 import { OHLCV } from '@/lib/backtest-engine'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
       maxCombinations: Math.min(Math.max(config.maxCombinations, 100), 10000),
       topN:            Math.min(config.topN || 50, 100),
       assetConfig:     { type: assetType, pointValue },
-      deadlineMs:      Date.now() + 50_000,   // 50s hard deadline — return partial results instead of timing out
+      deadlineMs:      Date.now() + 50_000,   // 50s hard deadline ??return partial results instead of timing out
     }
 
     const { results, testedCount, timedOut } = optimize(ohlcv, fullConfig)

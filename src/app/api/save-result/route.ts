@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 import { MonthlyPnL } from '@/lib/backtest-engine'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -106,7 +108,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ records: data })
 }
 
-// DELETE /api/save-result?id=... — delete one optimization record
+// DELETE /api/save-result?id=... ??delete one optimization record
 export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

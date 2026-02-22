@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// GET /api/strategies — list saved strategies for current user
+// GET /api/strategies ??list saved strategies for current user
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ strategies: data })
 }
 
-// POST /api/strategies — save a new strategy (or update by id)
+// POST /api/strategies ??save a new strategy (or update by id)
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
   const { id, projectName, strategyName, code } = body
 
   if (!strategyName?.trim() || !code?.trim()) {
-    return NextResponse.json({ error: '策略名稱與程式碼不能為空' }, { status: 400 })
+    return NextResponse.json({ error: '策略?�稱?��?式碼不能?�空' }, { status: 400 })
   }
 
   if (id) {
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, id: data?.id })
 }
 
-// DELETE /api/strategies?id=... — delete a strategy
+// DELETE /api/strategies?id=... ??delete a strategy
 export async function DELETE(req: NextRequest) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

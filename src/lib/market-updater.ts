@@ -5,10 +5,14 @@
  */
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Lazy singleton — not created at module load time so build succeeds without env vars
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+function getSupabase() {
+  if (!_supabase) _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return _supabase
+}
 
 interface OHLCV {
   timestamp: number; open: number; high: number; low: number; close: number; volume: number
@@ -79,7 +83,7 @@ async function upsert(assetId: number, timeframe: string, bars: OHLCV[]) {
     timestamp: b.timestamp,
     open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
   }))
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('historical_data')
     .upsert(rows, { onConflict: 'asset_id,timeframe,timestamp' })
   if (error) throw new Error(`Upsert error: ${error.message}`)
@@ -98,7 +102,7 @@ export async function updateAllAssets(): Promise<UpdateResult> {
 
   // Crypto (Binance)
   for (const symbol of ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']) {
-    const { data: asset } = await supabase.from('assets').select('id').eq('symbol', symbol).single()
+    const { data: asset } = await getSupabase().from('assets').select('id').eq('symbol', symbol).single()
     if (!asset) { errors.push(`Not found: ${symbol}`); continue }
 
     for (const tf of ['1H', '4H', '1D'] as const) {
@@ -112,7 +116,7 @@ export async function updateAllAssets(): Promise<UpdateResult> {
 
   // Futures (Yahoo Finance)
   for (const symbol of ['GC!', 'ES!', 'NQ!', 'SIL!', 'YM!']) {
-    const { data: asset } = await supabase.from('assets').select('id').eq('symbol', symbol).single()
+    const { data: asset } = await getSupabase().from('assets').select('id').eq('symbol', symbol).single()
     if (!asset) { errors.push(`Not found: ${symbol}`); continue }
 
     // 1H + derive 4H
