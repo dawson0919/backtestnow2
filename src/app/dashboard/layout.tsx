@@ -9,9 +9,11 @@ import { cn } from '@/lib/utils'
 const ADMIN_EMAIL = 'nbamoment@gmail.com'
 
 const navItems = [
-  { href: '/',                   icon: 'home',      label: '回到首頁' },
-  { href: '/dashboard',          icon: 'dashboard', label: '儀表板' },
-  { href: '/dashboard/backtest', icon: 'tune',      label: '優化器' },
+  { href: '/',                    icon: 'home',       label: '回到首頁' },
+  { href: '/dashboard',           icon: 'dashboard',  label: '儀表板' },
+  { href: '/dashboard/backtest',  icon: 'tune',       label: '優化器' },
+  { href: '/dashboard/reports',   icon: 'assessment', label: '每日報告' },
+  { href: '/dashboard/news',      icon: 'newspaper',  label: '財經新聞' },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
